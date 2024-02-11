@@ -1,0 +1,23 @@
+MUST:
+
+SHOULD:
+Distinguish between preset values and user values
+Prevent "New puzzle" button from being pressed while new puzzle is being generated
+Settings in UI for size and difficulty
+Dynamic UI based on screen size and orientation and grid size
+Android support
+Make puzzle generation more efficient
+    Profile for inefficient code (not in IntelliJ Community)
+    Start new puzzle if current generation taking long
+    More efficient method
+Undo back to manual checkpoint
+Visual improvements
+Make output of validator an object that you can get both descriptions and properties from, for text and cell highlighting
+
+COULD:
+Pre-calculate new puzzles in the background
+Manually or automatically mark rows/columns that are linked and show them
+Dark theme
+Undo step by step
+Show errors on grid itself
+Make sure there is only one way to solve a puzzle
