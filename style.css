@@ -1,0 +1,107 @@
+body {
+    font-family: Arial, sans-serif;
+}
+
+:root {
+    --block: 50px;
+}
+
+.row {
+    display: flex;
+    flex-direction: row;
+}
+
+.column {
+    display: flex;
+    flex-direction: column;
+}
+
+.box {
+    width: var(--block);
+    height: var(--block);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cell-btn {
+    width: var(--block);
+    height: var(--block);
+    border: 1px solid #ccc;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.cell-zero {
+    background-color: gray;
+    color: black;
+}
+
+.cell-one {
+    background-color: black;
+    color: white;
+}
+
+.cell-any {
+    background-color: white;
+    color: black;
+}
+
+.user-cell {
+    font-weight: bold;
+}
+
+.helper-cell {
+    color: lightgray;
+}
+
+.validity {
+    height: var(--block);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.validity.valid {
+    color: green;
+}
+
+.validity.invalid {
+    color: red;
+}
+
+button {
+    width: calc(var(--block) * 3);
+    height: var(--block);
+}
+
+.app-container {
+    align-items: center;
+}
+
+.slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: var(--block);
+}
+
+.slider-row label {
+    width: 100px;
+    text-align: right;
+}
+
+.slider-row input[type="range"] {
+    width: 160px;
+    height: auto;
+}
+
+.slider-value {
+    width: 40px;
+}
+
+body {
+    display: flex;
+    justify-content: center;
+    margin-top: 40px;
+}
