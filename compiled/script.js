@@ -32,7 +32,7 @@
       this.y = y;
       this.value = value;
     }
-    user = true;
+    user = false;
     toString() {
       return CellValue.toString(this.value);
     }
@@ -86,12 +86,10 @@
       if (rows !== null) return `Rows ${rows[0] + 1} and ${rows[1] + 1} are the same.`;
       return null;
     }
-    // checks complete puzzle
     isValid() {
       const valid = this.getFirstInvalidColumn() === null && this.getFirstInvalidRow() === null && this.getFirstEqualColumns() === null && this.getFirstEqualRows() === null;
       return valid;
     }
-    // checks only things affected by change
     isValidAfterChange(x, y) {
       const valid = this.isValidColumn(x) && this.isValidRow(y) && !this.columnEqualsAny(x) && !this.rowEqualsAny(y);
       return valid;
@@ -188,6 +186,20 @@
     }
   };
 
+  // src/puzzle/change.ts
+  var Change = class {
+    constructor(x, y, oldValue, newValue, reason) {
+      this.x = x;
+      this.y = y;
+      this.oldValue = oldValue;
+      this.newValue = newValue;
+      this.reason = reason;
+    }
+    apply(puzzle2) {
+      puzzle2.setValueAt(this.x, this.y, this.newValue);
+    }
+  };
+
   // src/puzzle/puzzle.ts
   var Puzzle = class {
     size;
@@ -281,19 +293,18 @@
       }
       return cells;
     }
-  };
-
-  // src/puzzle/change.ts
-  var Change = class {
-    constructor(x, y, oldValue, newValue, reason) {
-      this.x = x;
-      this.y = y;
-      this.oldValue = oldValue;
-      this.newValue = newValue;
-      this.reason = reason;
-    }
-    apply(puzzle2) {
-      puzzle2.setValueAt(this.x, this.y, this.newValue);
+    reset() {
+      const changes = [];
+      for (let x = 0; x < this.size; x++) {
+        for (let y = 0; y < this.size; y++) {
+          const oldValue = this.get(x, y);
+          if (oldValue !== 2 /* ANY */) {
+            changes.push(new Change(x, y, oldValue, 2 /* ANY */, 0 /* Reset */));
+            this.setValueAt(x, y, 2 /* ANY */);
+          }
+        }
+      }
+      return changes;
     }
   };
 
@@ -337,17 +348,17 @@
         const cellC = sequence.cells[i];
         let valueC = cellC.value;
         if (valueA === 2 /* ANY */ && valueB !== 2 /* ANY */ && valueB === valueC) {
-          const change = new Change(cellA.x, cellA.y, 2 /* ANY */, CellValue.opposite(valueB), 1 /* BesidesDouble */);
+          const change = new Change(cellA.x, cellA.y, 2 /* ANY */, CellValue.opposite(valueB), 2 /* BesidesDouble */);
           change.apply(puzzle2);
           changes.push(change);
           valueA = change.newValue;
         } else if (valueB === 2 /* ANY */ && valueA !== 2 /* ANY */ && valueA === valueC) {
-          const change = new Change(cellB.x, cellB.y, 2 /* ANY */, CellValue.opposite(valueA), 1 /* BesidesDouble */);
+          const change = new Change(cellB.x, cellB.y, 2 /* ANY */, CellValue.opposite(valueA), 2 /* BesidesDouble */);
           change.apply(puzzle2);
           changes.push(change);
           valueB = change.newValue;
         } else if (valueC === 2 /* ANY */ && valueA !== 2 /* ANY */ && valueA === valueB) {
-          const change = new Change(cellC.x, cellC.y, 2 /* ANY */, CellValue.opposite(valueB), 2 /* BetweenSame */);
+          const change = new Change(cellC.x, cellC.y, 2 /* ANY */, CellValue.opposite(valueB), 3 /* BetweenSame */);
           change.apply(puzzle2);
           changes.push(change);
           valueC = change.newValue;
@@ -372,7 +383,7 @@
         const remainingValue = zeroComplete ? 1 /* ONE */ : 0 /* ZERO */;
         for (const cell of sequence.cells) {
           if (cell.value === 2 /* ANY */) {
-            const change = new Change(cell.x, cell.y, 2 /* ANY */, remainingValue, 3 /* SingleValueRemaining */);
+            const change = new Change(cell.x, cell.y, 2 /* ANY */, remainingValue, 4 /* SingleValueRemaining */);
             change.apply(puzzle2);
             changes.push(change);
           }
@@ -381,26 +392,87 @@
       }
       return [];
     }
+    static allSimilarSequences(puzzle2) {
+      const similarColumns = [];
+      const similarRows = [];
+      for (let i = 0; i < puzzle2.size; i++) {
+        similarColumns.push(_Solver.similarSequences(puzzle2.columns, i, puzzle2.halfSize));
+        similarRows.push(_Solver.similarSequences(puzzle2.rows, i, puzzle2.halfSize));
+      }
+      return { columns: similarColumns, rows: similarRows };
+    }
+    static similarSequences(sequences, selected, gapThreshold) {
+      const target = sequences[selected];
+      const similar = [];
+      if (target.counts[2 /* ANY */] > gapThreshold) {
+        return similar;
+      }
+      for (let i = 0; i < sequences.length; i++) {
+        if (i !== selected && sequences[i].counts[2 /* ANY */] <= gapThreshold) {
+          const other = sequences[i];
+          let isSimilar = true;
+          for (let j = 0; j < target.cells.length; j++) {
+            const valueA = target.cells[j].value;
+            const valueB = other.cells[j].value;
+            if (valueA !== 2 /* ANY */ && valueB !== 2 /* ANY */ && valueA !== valueB) {
+              isSimilar = false;
+              break;
+            }
+          }
+          if (isSimilar) {
+            similar.push(i);
+          }
+        }
+      }
+      return similar;
+    }
   };
 
   // src/tools/generator.ts
   var PuzzleGenerator = class _PuzzleGenerator {
-    static emptyCells(puzzle2, emptyRatio2) {
+    static generate(size, emptyRatio2, skew) {
+      const puzzle2 = _PuzzleGenerator.createSolvedPuzzle(size);
+      _PuzzleGenerator.emptyCells(puzzle2, emptyRatio2, skew);
+      _PuzzleGenerator.setUserAttribute(puzzle2);
+      return puzzle2;
+    }
+    static emptyCells(puzzle2, emptyRatio2, skew) {
       const cells = puzzle2.getAllCells();
-      const emptyCells = Math.floor(puzzle2.getNumberOfCells() * emptyRatio2);
-      for (let i = 0; i < emptyCells; i++) {
-        _PuzzleGenerator.emptyRandomCell(puzzle2, cells);
+      const targetEmpty = Math.floor(puzzle2.getNumberOfCells() * emptyRatio2);
+      if (skew * targetEmpty > cells.length / 2) {
+        console.warn(`Skew ${skew} is too high for empty ratio ${emptyRatio2}, adjusting to fit.`);
+        skew = cells.length / 2 / targetEmpty;
       }
-      for (const cell of cells) {
-        if (cell.value !== 2 /* ANY */) {
-          cell.user = false;
+      const skewZeroPreferred = Math.random() < 0.5;
+      const skewZero = skewZeroPreferred ? skew : 1 - skew;
+      const skewOne = skewZeroPreferred ? 1 - skew : skew;
+      const targetEmptyZero = Math.ceil(targetEmpty * skewZero);
+      const targetEmptyOne = Math.ceil(targetEmpty * skewOne);
+      let emptyZero = 0;
+      let emptyOne = 0;
+      while (emptyZero + emptyOne < targetEmpty && cells.length > 0) {
+        const randomIndex = Math.floor(Math.random() * cells.length);
+        const randomCell = cells.splice(randomIndex, 1)[0];
+        if (randomCell.value === 2 /* ANY */) {
+          continue;
+        }
+        const needsZero = randomCell.value === 0 /* ZERO */ && emptyZero < targetEmptyZero;
+        const needsOne = randomCell.value === 1 /* ONE */ && emptyOne < targetEmptyOne;
+        if (needsZero || needsOne) {
+          if (randomCell.value === 0 /* ZERO */) {
+            emptyZero++;
+          } else {
+            emptyOne++;
+          }
+          puzzle2.setValueAt(randomCell.x, randomCell.y, 2 /* ANY */);
         }
       }
     }
-    static emptyRandomCell(puzzle2, cells) {
-      const randomIndex = Math.floor(Math.random() * cells.length);
-      const cell = cells.splice(randomIndex, 1)[0];
-      puzzle2.setValueAt(cell.x, cell.y, 2 /* ANY */);
+    static setUserAttribute(puzzle2) {
+      const cells = puzzle2.getAllCells();
+      for (const cell of cells) {
+        cell.user = cell.value === 2 /* ANY */;
+      }
     }
     static createSolvedPuzzle(size) {
       const puzzle2 = new Puzzle(size);
@@ -422,11 +494,8 @@
           }
         }
       }
-      let solution = "Solved puzzle:";
-      for (const row2 of puzzle2.rows) {
-        solution += "\n" + row2.cells.map((c) => c.value).join(" ");
-      }
-      console.log(solution);
+      console.log(`Solved puzzle:
+${puzzle2.toString()}`);
       return true;
     }
     static solveAndGuess(puzzle2, unsolved) {
@@ -472,6 +541,76 @@
     }
   };
 
+  // src/tools/history.ts
+  var History = class {
+    undoStack = [];
+    redoStack = [];
+    puzzle;
+    constructor(puzzle2) {
+      this.puzzle = puzzle2;
+    }
+    recordChange(change) {
+      const previousChanges = this.undoStack[this.undoStack.length - 1];
+      if (previousChanges && previousChanges.length === 1) {
+        const previousChange = previousChanges[0];
+        if (previousChange.x === change.x && previousChange.y === change.y && previousChange.reason === change.reason) {
+          if (previousChange.oldValue === change.newValue) {
+            this.undoStack.pop();
+          } else {
+            previousChange.newValue = change.newValue;
+          }
+          this.redoStack = [];
+          return;
+        }
+      }
+      this.recordChangeSet([change]);
+    }
+    recordChangeSet(changes) {
+      if (changes.length === 0) return;
+      this.undoStack.push(changes);
+      this.redoStack = [];
+    }
+    undo() {
+      if (!this.canUndo()) {
+        return false;
+      }
+      const changeSet = this.undoStack.pop();
+      if (changeSet) {
+        for (let i = changeSet.length - 1; i >= 0; i--) {
+          const change = changeSet[i];
+          this.puzzle.setValueAt(change.x, change.y, change.oldValue);
+        }
+        this.redoStack.push(changeSet);
+        return true;
+      }
+      return false;
+    }
+    redo() {
+      if (!this.canRedo()) {
+        return false;
+      }
+      const changeSet = this.redoStack.pop();
+      if (changeSet) {
+        for (const change of changeSet) {
+          this.puzzle.setValueAt(change.x, change.y, change.newValue);
+        }
+        this.undoStack.push(changeSet);
+        return true;
+      }
+      return false;
+    }
+    canUndo() {
+      return this.undoStack.length > 0;
+    }
+    canRedo() {
+      return this.redoStack.length > 0;
+    }
+    clear() {
+      this.undoStack = [];
+      this.redoStack = [];
+    }
+  };
+
   // src/ui/ui.ts
   var DEFAULT_PUZZLE_SIZE = 10;
   var MIN_PUZZLE_SIZE = 6;
@@ -481,17 +620,26 @@
   var MIN_EMPTY_RATIO = 0.35;
   var MAX_EMPTY_RATIO = 0.65;
   var EMPTY_RATIO_STEP = 0.05;
+  var DEFAULT_EMPTY_SKEW = 0.7;
+  var MIN_EMPTY_SKEW = 0.5;
+  var MAX_EMPTY_SKEW = 0.9;
+  var EMPTY_SKEW_STEP = 0.1;
   var puzzleSize = DEFAULT_PUZZLE_SIZE;
   var emptyRatio = DEFAULT_EMPTY_RATIO;
+  var emptySkew = DEFAULT_EMPTY_SKEW;
   var CELL_CLASS = {
     [0 /* ZERO */]: "cell-zero",
     [1 /* ONE */]: "cell-one",
     [2 /* ANY */]: "cell-any"
   };
   var puzzle;
-  var appEl;
+  var history;
+  var appElement;
   var generating = false;
   var showHints = false;
+  var selectedType = null;
+  var selectedIndex = null;
+  var similarIndices = [];
   function row() {
     const el = document.createElement("div");
     el.className = "row";
@@ -510,17 +658,21 @@
   }
   function cellButton(x, y) {
     const cell = puzzle.getCell(x, y);
-    const btn = document.createElement("button");
-    btn.className = `cell-btn ${CELL_CLASS[cell.value]}`;
-    btn.textContent = cell.toString();
+    const button = document.createElement("button");
+    button.className = `cell-button ${CELL_CLASS[cell.value]}`;
+    button.textContent = cell.toString();
     if (cell.user) {
-      btn.classList.add("user-cell");
-      btn.addEventListener("click", () => {
-        puzzle.setNextValueAt(x, y);
+      button.classList.add("user-cell");
+      button.addEventListener("click", () => {
+        const oldValue = puzzle.get(x, y);
+        const newValue = CellValue.next(oldValue);
+        const change = new Change(x, y, oldValue, newValue, 1 /* UserInput */);
+        history.recordChange(change);
+        puzzle.setValueAt(x, y, newValue);
         render();
       });
     }
-    return btn;
+    return button;
   }
   function remainingTextRow(y) {
     const zeroCount = puzzle.getRemainingValueCountInRow(y, 0 /* ZERO */);
@@ -538,30 +690,69 @@
     const oneText = oneCount == 0 ? "." : oneCount.toString();
     return `${zeroText} / ${oneText}`;
   }
-  function renderPuzzle() {
+  function renderPuzzle(parentElement) {
     const size = puzzle.size;
     const outerRow = row();
-    const idxCol = col();
-    idxCol.appendChild(box());
+    const allSimilarSequences = Solver.allSimilarSequences(puzzle);
+    const indexColumn = col();
+    indexColumn.appendChild(box());
     for (let y = 0; y < size; y++) {
-      const rowNum = showHints ? box((y + 1).toString()) : box();
-      rowNum.classList.add("helper-cell");
-      idxCol.appendChild(rowNum);
+      const showSimilarRows = showHints && allSimilarSequences.rows[y].length > 0;
+      const rowNumber = showSimilarRows ? box(allSimilarSequences.rows[y].length.toString()) : box();
+      rowNumber.classList.add("helper-cell");
+      rowNumber.style.cursor = "pointer";
+      if (selectedType === "row" && selectedIndex === y) {
+        rowNumber.classList.add("indicator-selected");
+      } else if (selectedType === "row" && similarIndices.includes(y)) {
+        rowNumber.classList.add("indicator-similar");
+      }
+      rowNumber.addEventListener("click", () => {
+        if (!showHints || selectedType === "row" && selectedIndex === y) {
+          selectedType = null;
+          selectedIndex = null;
+          similarIndices = [];
+        } else {
+          selectedType = "row";
+          selectedIndex = y;
+          similarIndices = Solver.similarSequences(puzzle.rows, y, puzzle.halfSize);
+        }
+        render();
+      });
+      indexColumn.appendChild(rowNumber);
     }
-    outerRow.appendChild(idxCol);
+    outerRow.appendChild(indexColumn);
     for (let x = 0; x < size; x++) {
-      const c = col();
-      const header = showHints ? box((x + 1).toString()) : box();
+      const column = col();
+      const showSimilarColumns = showHints && allSimilarSequences.columns[x].length > 0;
+      const header = showSimilarColumns ? box(allSimilarSequences.columns[x].length.toString()) : box();
       header.classList.add("helper-cell");
-      c.appendChild(header);
+      header.style.cursor = "pointer";
+      if (selectedType === "column" && selectedIndex === x) {
+        header.classList.add("indicator-selected");
+      } else if (selectedType === "column" && similarIndices.includes(x)) {
+        header.classList.add("indicator-similar");
+      }
+      header.addEventListener("click", () => {
+        if (!showHints || selectedType === "column" && selectedIndex === x) {
+          selectedType = null;
+          selectedIndex = null;
+          similarIndices = [];
+        } else {
+          selectedType = "column";
+          selectedIndex = x;
+          similarIndices = Solver.similarSequences(puzzle.columns, x, puzzle.halfSize);
+        }
+        render();
+      });
+      column.appendChild(header);
       for (let y = 0; y < size; y++) {
-        c.appendChild(cellButton(x, y));
+        column.appendChild(cellButton(x, y));
       }
       const text = showHints ? remainingTextColumn(x) : "";
       const remaining = box(text);
       remaining.classList.add("helper-cell");
-      c.appendChild(remaining);
-      outerRow.appendChild(c);
+      column.appendChild(remaining);
+      outerRow.appendChild(column);
     }
     const remainingColumn = col();
     remainingColumn.appendChild(box());
@@ -572,14 +763,23 @@
       remainingColumn.appendChild(remaining);
     }
     outerRow.appendChild(remainingColumn);
-    return outerRow;
+    parentElement.appendChild(outerRow);
+  }
+  function genericButton(label, id, onClick, disabled = false) {
+    const button = document.createElement("button");
+    button.id = id;
+    button.className = "generic-button";
+    button.textContent = label;
+    button.disabled = disabled;
+    button.addEventListener("click", onClick);
+    return button;
   }
   function sliderRow(label, min, max, step, value, format, onChange) {
     const container = document.createElement("div");
     container.className = "slider-row";
-    const lbl = document.createElement("label");
-    lbl.textContent = label;
-    container.appendChild(lbl);
+    const labelElement = document.createElement("label");
+    labelElement.textContent = label;
+    container.appendChild(labelElement);
     const slider = document.createElement("input");
     slider.type = "range";
     slider.min = min.toString();
@@ -592,18 +792,14 @@
     display.textContent = format(value);
     container.appendChild(display);
     slider.addEventListener("input", () => {
-      const v = parseFloat(slider.value);
-      display.textContent = format(v);
-      onChange(v);
+      const value2 = parseFloat(slider.value);
+      display.textContent = format(value2);
+      onChange(value2);
     });
     return container;
   }
-  function render() {
-    appEl.innerHTML = "";
-    const outerCol = col();
-    outerCol.classList.add("app-container");
-    const invalidReason = puzzle.validator.getInvalidReason();
-    outerCol.appendChild(sliderRow(
+  function renderPuzzleCreation(parentElement) {
+    parentElement.appendChild(sliderRow(
       "Puzzle size:",
       MIN_PUZZLE_SIZE,
       MAX_PUZZLE_SIZE,
@@ -614,7 +810,7 @@
         puzzleSize = v;
       }
     ));
-    outerCol.appendChild(sliderRow(
+    parentElement.appendChild(sliderRow(
       "Empty cells:",
       MIN_EMPTY_RATIO,
       MAX_EMPTY_RATIO,
@@ -625,66 +821,83 @@
         emptyRatio = v;
       }
     ));
-    const btn = document.createElement("button");
-    btn.className = "new-puzzle-btn";
-    btn.textContent = "New puzzle";
-    btn.addEventListener("click", () => {
-      generatePuzzle();
-    });
-    outerCol.appendChild(btn);
-    const reset = document.createElement("button");
-    reset.className = "reset-btn";
-    reset.textContent = "Reset";
-    reset.addEventListener("click", () => {
-      for (let x = 0; x < puzzle.size; x++) {
-        for (let y = 0; y < puzzle.size; y++) {
-          if (puzzle.getCell(x, y).user) {
-            puzzle.setValueAt(x, y, 2 /* ANY */);
-          }
-        }
+    parentElement.appendChild(sliderRow(
+      "Empty skew:",
+      MIN_EMPTY_SKEW,
+      MAX_EMPTY_SKEW,
+      EMPTY_SKEW_STEP,
+      emptySkew,
+      (v) => `${Math.round(v * 100)}/${Math.round((1 - v) * 100)}`,
+      (v) => {
+        emptySkew = v;
       }
-      render();
-    });
-    outerCol.appendChild(reset);
-    const solve = document.createElement("button");
-    solve.className = "solve-btn";
-    solve.textContent = "Solve";
-    solve.addEventListener("click", () => {
-      Solver.trySolve(puzzle);
-      render();
-    });
-    outerCol.appendChild(solve);
-    const showHintsButton = document.createElement("button");
-    showHintsButton.className = "hints-btn";
-    showHintsButton.textContent = "Show hints";
-    showHintsButton.addEventListener("click", () => {
-      showHintsButton.classList.toggle("active");
-      showHints = !showHints;
-      render();
-    });
-    outerCol.appendChild(showHintsButton);
+    ));
+    parentElement.appendChild(genericButton("New puzzle", "new-puzzle-button", () => generatePuzzle()));
+  }
+  function renderValidity(parentElement, puzzle2) {
+    const invalidReason = puzzle2.validator.getInvalidReason();
     const validityEl = document.createElement("div");
     validityEl.className = `validity ${invalidReason ? "invalid" : "valid"}`;
     validityEl.textContent = invalidReason ?? "Valid";
-    outerCol.appendChild(validityEl);
-    if (puzzle.validator.isSolved()) {
+    parentElement.appendChild(validityEl);
+    if (puzzle2.validator.isSolved()) {
       const el = document.createElement("div");
       el.textContent = "Congratulations, you solved the puzzle!";
-      outerCol.appendChild(el);
+      parentElement.appendChild(el);
     }
-    outerCol.appendChild(renderPuzzle());
-    appEl.appendChild(outerCol);
+  }
+  function renderPuzzleButtons(parentElement) {
+    const showHintsButton = genericButton(showHints ? "Hide hints" : "Show hints", "hints-button", () => {
+      showHints = !showHints;
+      selectedType = null;
+      selectedIndex = null;
+      similarIndices = [];
+      render();
+    });
+    if (showHints) showHintsButton.classList.add("active");
+    parentElement.appendChild(showHintsButton);
+    parentElement.appendChild(genericButton("Undo", "undo-button", () => {
+      history.undo();
+      render();
+    }, !history.canUndo()));
+    parentElement.appendChild(genericButton("Redo", "redo-button", () => {
+      history.redo();
+      render();
+    }, !history.canRedo()));
+    parentElement.appendChild(genericButton("Solve", "solve-button", () => {
+      const changes = Solver.trySolve(puzzle);
+      history.recordChangeSet(changes);
+      render();
+    }));
+    parentElement.appendChild(genericButton("Reset", "reset-button", () => {
+      const changes = puzzle.reset();
+      history.recordChangeSet(changes);
+      render();
+    }));
+  }
+  function render() {
+    appElement.innerHTML = "";
+    const outerColumn = col();
+    outerColumn.classList.add("app-container");
+    renderPuzzleCreation(outerColumn);
+    renderPuzzle(outerColumn);
+    renderValidity(outerColumn, puzzle);
+    renderPuzzleButtons(outerColumn);
+    appElement.appendChild(outerColumn);
   }
   function generatePuzzle() {
     if (!generating) {
       generating = true;
-      const newPuzzleButton = document.querySelector(".new-puzzle-btn");
+      const newPuzzleButton = document.querySelector(".new-puzzle-button");
       if (newPuzzleButton) {
         newPuzzleButton.innerHTML = "Generating...";
         newPuzzleButton.disabled = true;
       }
-      puzzle = PuzzleGenerator.createSolvedPuzzle(puzzleSize);
-      PuzzleGenerator.emptyCells(puzzle, emptyRatio);
+      puzzle = PuzzleGenerator.generate(puzzleSize, emptyRatio, emptySkew);
+      history = new History(puzzle);
+      selectedType = null;
+      selectedIndex = null;
+      similarIndices = [];
       render();
       generating = false;
       if (newPuzzleButton) {
@@ -694,7 +907,7 @@
     }
   }
   document.addEventListener("DOMContentLoaded", () => {
-    appEl = document.getElementById("app");
+    appElement = document.getElementById("app");
     generatePuzzle();
   });
 })();

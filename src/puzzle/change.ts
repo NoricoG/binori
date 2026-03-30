@@ -2,10 +2,11 @@ import { CellValue } from "@puzzle/cellValue";
 import { Puzzle } from "@puzzle/puzzle";
 
 export enum ChangeReason {
-    UserInput = 0,
-    BesidesDouble = 1,
-    BetweenSame = 2,
-    SingleValueRemaining = 3,
+    Reset = 0,
+    UserInput = 1,
+    BesidesDouble = 2,
+    BetweenSame = 3,
+    SingleValueRemaining = 4,
 }
 
 export class Change {

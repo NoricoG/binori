@@ -1,7 +1,7 @@
 import { CellValue } from "@puzzle/cellValue";
 
 export class Cell {
-    user: boolean = true;
+    user: boolean = false;
 
     constructor(
         public x: number,

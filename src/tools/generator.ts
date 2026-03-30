@@ -6,23 +6,58 @@ import { Solver } from "@tools/solver";
 
 export class PuzzleGenerator {
 
-    static emptyCells(puzzle: Puzzle, emptyRatio: number): void {
+    static generate(size: number, emptyRatio: number, skew: number): Puzzle {
+        const puzzle = PuzzleGenerator.createSolvedPuzzle(size);
+        PuzzleGenerator.emptyCells(puzzle, emptyRatio, skew);
+        PuzzleGenerator.setUserAttribute(puzzle);
+        return puzzle;
+    }
+
+    static emptyCells(puzzle: Puzzle, emptyRatio: number, skew: number): void {
         const cells = puzzle.getAllCells();
-        const emptyCells = Math.floor(puzzle.getNumberOfCells() * emptyRatio);
-        for (let i = 0; i < emptyCells; i++) {
-            PuzzleGenerator.emptyRandomCell(puzzle, cells);
+        const targetEmpty = Math.floor(puzzle.getNumberOfCells() * emptyRatio);
+
+        if (skew * targetEmpty > cells.length / 2) {
+            console.warn(`Skew ${skew} is too high for empty ratio ${emptyRatio}, adjusting to fit.`);
+            skew = (cells.length / 2) / targetEmpty;
         }
-        for (const cell of cells) {
-            if (cell.value !== CellValue.ANY) {
-                cell.user = false;
+
+        const skewZeroPreferred = Math.random() < 0.5;
+        const skewZero = skewZeroPreferred ? skew : 1 - skew;
+        const skewOne = skewZeroPreferred ? 1 - skew : skew;
+        const targetEmptyZero = Math.ceil(targetEmpty * skewZero);
+        const targetEmptyOne = Math.ceil(targetEmpty * skewOne);
+
+        let emptyZero = 0;
+        let emptyOne = 0;
+
+        while (emptyZero + emptyOne < targetEmpty && cells.length > 0) {
+            const randomIndex = Math.floor(Math.random() * cells.length);
+            const randomCell = cells.splice(randomIndex, 1)[0];
+
+            if (randomCell.value === CellValue.ANY) {
+                continue;
+            }
+
+            const needsZero = randomCell.value === CellValue.ZERO && emptyZero < targetEmptyZero;
+            const needsOne = randomCell.value === CellValue.ONE && emptyOne < targetEmptyOne;
+
+            if (needsZero || needsOne) {
+                if (randomCell.value === CellValue.ZERO) {
+                    emptyZero++;
+                } else {
+                    emptyOne++;
+                }
+                puzzle.setValueAt(randomCell.x, randomCell.y, CellValue.ANY);
             }
         }
     }
 
-    private static emptyRandomCell(puzzle: Puzzle, cells: Cell[]): void {
-        const randomIndex = Math.floor(Math.random() * cells.length);
-        const cell = cells.splice(randomIndex, 1)[0];
-        puzzle.setValueAt(cell.x, cell.y, CellValue.ANY);
+    static setUserAttribute(puzzle: Puzzle): void {
+        const cells = puzzle.getAllCells();
+        for (const cell of cells) {
+            cell.user = cell.value === CellValue.ANY;
+        }
     }
 
     static createSolvedPuzzle(size: number): Puzzle {
@@ -47,7 +82,7 @@ export class PuzzleGenerator {
                 }
             }
         }
-        console.log("Solved puzzle:", puzzle.toString());
+        console.log(`Solved puzzle:\n${puzzle.toString()}`);
         return true;
     }
 

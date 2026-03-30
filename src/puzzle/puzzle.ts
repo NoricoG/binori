@@ -2,6 +2,7 @@ import { Cell } from "@puzzle/cell";
 import { CellValue } from "@puzzle/cellValue";
 import { Sequence } from "@puzzle/sequence";
 import { Validator } from "@tools/validator";
+import { Change, ChangeReason } from "./change";
 
 export class Puzzle {
     readonly size: number;
@@ -110,5 +111,19 @@ export class Puzzle {
             }
         }
         return cells;
+    }
+
+    reset(): Change[] {
+        const changes: Change[] = [];
+        for (let x = 0; x < this.size; x++) {
+            for (let y = 0; y < this.size; y++) {
+                const oldValue = this.get(x, y);
+                if (oldValue !== CellValue.ANY) {
+                    changes.push(new Change(x, y, oldValue, CellValue.ANY, ChangeReason.Reset));
+                    this.setValueAt(x, y, CellValue.ANY);
+                }
+            }
+        }
+        return changes;
     }
 }

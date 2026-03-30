@@ -103,4 +103,42 @@ export class Solver {
         }
         return [];
     }
+
+    static allSimilarSequences(puzzle: Puzzle): { columns: number[][], rows: number[][] } {
+        const similarColumns = [];
+        const similarRows = [];
+        for (let i = 0; i < puzzle.size; i++) {
+            similarColumns.push(Solver.similarSequences(puzzle.columns, i, puzzle.halfSize));
+            similarRows.push(Solver.similarSequences(puzzle.rows, i, puzzle.halfSize));
+        }
+        return { columns: similarColumns, rows: similarRows };
+    }
+
+    static similarSequences(sequences: Sequence[], selected: number, gapThreshold: number): number[] {
+        const target = sequences[selected];
+        const similar: number[] = [];
+
+        if (target.counts[CellValue.ANY] > gapThreshold) {
+            return similar;
+        }
+
+        for (let i = 0; i < sequences.length; i++) {
+            if (i !== selected && sequences[i].counts[CellValue.ANY] <= gapThreshold) {
+                const other = sequences[i];
+                let isSimilar = true;
+                for (let j = 0; j < target.cells.length; j++) {
+                    const valueA = target.cells[j].value;
+                    const valueB = other.cells[j].value;
+                    if (valueA !== CellValue.ANY && valueB !== CellValue.ANY && valueA !== valueB) {
+                        isSimilar = false;
+                        break;
+                    }
+                }
+                if (isSimilar) {
+                    similar.push(i);
+                }
+            }
+        }
+        return similar;
+    }
 }

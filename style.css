@@ -24,12 +24,13 @@ body {
     justify-content: center;
 }
 
-.cell-btn {
+.cell-button {
     width: var(--block);
     height: var(--block);
     border: 1px solid #ccc;
     cursor: pointer;
     font-size: 16px;
+    touch-action: manipulation;
 }
 
 .cell-zero {
@@ -55,6 +56,16 @@ body {
     color: lightgray;
 }
 
+.indicator-selected {
+    background-color: darkgrey;
+    color: black;
+}
+
+.indicator-similar {
+    background-color: lightgray;
+    color: black;
+}
+
 .validity {
     height: var(--block);
     display: flex;
@@ -73,6 +84,10 @@ body {
 button {
     width: calc(var(--block) * 3);
     height: var(--block);
+}
+
+.generic-button {
+    margin: 0.5em;
 }
 
 .app-container {
