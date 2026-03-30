@@ -25,16 +25,16 @@ export class Validator {
 
     getInvalidReason(): string | null {
         const col = this.getFirstInvalidColumn();
-        if (col !== null) return `Column ${col + 1} is invalid.`;
+        if (col !== null) return `Column ${col + 1} is invalid`;
 
         const row = this.getFirstInvalidRow();
-        if (row !== null) return `Row ${row + 1} is invalid.`;
+        if (row !== null) return `Row ${row + 1} is invalid`;
 
         const cols = this.getFirstEqualColumns();
-        if (cols !== null) return `Columns ${cols[0] + 1} and ${cols[1] + 1} are the same.`;
+        if (cols !== null) return `Columns ${cols[0] + 1} and ${cols[1] + 1} are the same`;
 
         const rows = this.getFirstEqualRows();
-        if (rows !== null) return `Rows ${rows[0] + 1} and ${rows[1] + 1} are the same.`;
+        if (rows !== null) return `Rows ${rows[0] + 1} and ${rows[1] + 1} are the same`;
 
         return null;
     }

@@ -117,9 +117,9 @@ export class Puzzle {
         const changes: Change[] = [];
         for (let x = 0; x < this.size; x++) {
             for (let y = 0; y < this.size; y++) {
-                const oldValue = this.get(x, y);
-                if (oldValue !== CellValue.ANY) {
-                    changes.push(new Change(x, y, oldValue, CellValue.ANY, ChangeReason.Reset));
+                const cell = this.getCell(x, y);
+                if (cell.user) {
+                    changes.push(new Change(x, y, cell.value, CellValue.ANY, ChangeReason.Reset));
                     this.setValueAt(x, y, CellValue.ANY);
                 }
             }

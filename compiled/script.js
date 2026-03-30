@@ -77,13 +77,13 @@
     }
     getInvalidReason() {
       const col2 = this.getFirstInvalidColumn();
-      if (col2 !== null) return `Column ${col2 + 1} is invalid.`;
+      if (col2 !== null) return `Column ${col2 + 1} is invalid`;
       const row2 = this.getFirstInvalidRow();
-      if (row2 !== null) return `Row ${row2 + 1} is invalid.`;
+      if (row2 !== null) return `Row ${row2 + 1} is invalid`;
       const cols = this.getFirstEqualColumns();
-      if (cols !== null) return `Columns ${cols[0] + 1} and ${cols[1] + 1} are the same.`;
+      if (cols !== null) return `Columns ${cols[0] + 1} and ${cols[1] + 1} are the same`;
       const rows = this.getFirstEqualRows();
-      if (rows !== null) return `Rows ${rows[0] + 1} and ${rows[1] + 1} are the same.`;
+      if (rows !== null) return `Rows ${rows[0] + 1} and ${rows[1] + 1} are the same`;
       return null;
     }
     isValid() {
@@ -297,9 +297,9 @@
       const changes = [];
       for (let x = 0; x < this.size; x++) {
         for (let y = 0; y < this.size; y++) {
-          const oldValue = this.get(x, y);
-          if (oldValue !== 2 /* ANY */) {
-            changes.push(new Change(x, y, oldValue, 2 /* ANY */, 0 /* Reset */));
+          const cell = this.getCell(x, y);
+          if (cell.user) {
+            changes.push(new Change(x, y, cell.value, 2 /* ANY */, 0 /* Reset */));
             this.setValueAt(x, y, 2 /* ANY */);
           }
         }
@@ -768,7 +768,6 @@ ${puzzle2.toString()}`);
   function genericButton(label, id, onClick, disabled = false) {
     const button = document.createElement("button");
     button.id = id;
-    button.className = "generic-button";
     button.textContent = label;
     button.disabled = disabled;
     button.addEventListener("click", onClick);
@@ -835,16 +834,16 @@ ${puzzle2.toString()}`);
     parentElement.appendChild(genericButton("New puzzle", "new-puzzle-button", () => generatePuzzle()));
   }
   function renderValidity(parentElement, puzzle2) {
-    const invalidReason = puzzle2.validator.getInvalidReason();
-    const validityEl = document.createElement("div");
-    validityEl.className = `validity ${invalidReason ? "invalid" : "valid"}`;
-    validityEl.textContent = invalidReason ?? "Valid";
-    parentElement.appendChild(validityEl);
+    const el = document.createElement("div");
     if (puzzle2.validator.isSolved()) {
-      const el = document.createElement("div");
       el.textContent = "Congratulations, you solved the puzzle!";
-      parentElement.appendChild(el);
+      el.className = `validity solved`;
+    } else {
+      const invalidReason = puzzle2.validator.getInvalidReason();
+      el.className = `validity ${invalidReason ? "invalid" : "valid"} `;
+      el.textContent = invalidReason ?? "Valid";
     }
+    parentElement.appendChild(el);
   }
   function renderPuzzleButtons(parentElement) {
     const showHintsButton = genericButton(showHints ? "Hide hints" : "Show hints", "hints-button", () => {

@@ -185,7 +185,6 @@ function renderPuzzle(parentElement: HTMLElement) {
 function genericButton(label: string, id: string, onClick: () => void, disabled = false): HTMLButtonElement {
     const button = document.createElement("button");
     button.id = id;
-    button.className = "generic-button";
     button.textContent = label;
     button.disabled = disabled;
     button.addEventListener("click", onClick);
@@ -243,19 +242,17 @@ function renderPuzzleCreation(parentElement: HTMLElement): void {
 }
 
 function renderValidity(parentElement: HTMLElement, puzzle: Puzzle): void {
-    const invalidReason = puzzle.validator.getInvalidReason();
-
-
-    const validityEl = document.createElement("div");
-    validityEl.className = `validity ${invalidReason ? "invalid" : "valid"}`;
-    validityEl.textContent = invalidReason ?? "Valid";
-    parentElement.appendChild(validityEl);
+    const el = document.createElement("div");
 
     if (puzzle.validator.isSolved()) {
-        const el = document.createElement("div");
         el.textContent = "Congratulations, you solved the puzzle!";
-        parentElement.appendChild(el);
+        el.className = `validity solved`;
+    } else {
+        const invalidReason = puzzle.validator.getInvalidReason();
+        el.className = `validity ${invalidReason ? "invalid" : "valid"} `;
+        el.textContent = invalidReason ?? "Valid";
     }
+    parentElement.appendChild(el);
 }
 
 function renderPuzzleButtons(parentElement: HTMLElement): void {
